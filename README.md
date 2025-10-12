@@ -1,10 +1,5 @@
 # 🎓 Automated Timetable Generator using Constraint Satisfaction Problems
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.28%2B-red)
-![License](https://img.shields.io/badge/License-MIT-green)
-![Status](https://img.shields.io/badge/Status-In%20Development-orange)
-
 An Intelligent Systems project that formulates university timetable generation as a **Constraint Satisfaction Problem (CSP)** and solves it using advanced backtracking algorithms with optimization techniques.
 
 ## 📊 Project Overview
