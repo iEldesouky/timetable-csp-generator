@@ -1,57 +1,43 @@
-RoomID,Type,Capacity
-R101,Lecture,80
-R102,Lecture,80
-R103,Lecture,80
-R104,Lecture,80
-R105,Lecture,80
-R106,Lecture,80
-R107,Lecture,80
-R108,Lecture,80
-R109,Lecture,80
-R110,Lecture,80
-R111,Lecture,80
-R112,Lecture,80
-R113,Lecture,80
-R114,Lecture,80
-L1,Lab,35
-L2,Lab,35
-L3,Lab,35
-L4,Lab,35
-L5,Lab,35
-L6,Lab,35
-L7,Lab,35
-L8,Lab,35
-L9,Lab,35
-L10,Lab,35
-L11,Lab,35
-L12,Lab,35
-L13,Lab,35
-L14,Lab,35
-L15,Lab,35
-L16,Lab,35
-L17,Lab,35
-L18,Lab,35
-L19,Lab,35
-L20,Lab,35
-L21,Lab,35
-L22,Lab,35
-L23,Lab,35
-L24,Lab,35
-L25,Lab,35
-L26,Lab,35
-L27,Lab,35
-L28,Lab,35
-L29,Lab,35
-L30,Lab,35
-L31,Lab,35
-L32,Lab,35
-L33,Lab,35
-L34,Lab,35
-L35,Lab,35
-L36,Lab,35
-L37,Lab,35
-L38,Lab,35
-L39,Lab,35
-L40,Lab,35
-L41,Lab,35
-L42,Lab,35
+﻿room_id,type,capacity
+B07 F1.01,Tutorial,15
+B07 F1.02,Tutorial,15
+B07 F1.04,Lab,15
+B07 F1.20,Tutorial,15
+B07 F1.21,Tutorial,15
+B07 F1.22,Tutorial,15
+B07 F1.23,Tutorial,15
+B07 F1.24,Lecture,15
+B07 G01,Lecture,45
+B07 G12,Lab,15
+B17.G17,Lab,45
+B17-G01,Lab,30
+B17-G16,Lab,15
+B17-G22,Lab,30
+B18 F1.08,Tutorial,15
+B18 F1.1,Lecture,45
+B18 F1.10,Lecture,45
+B18 F1.12,Tutorial,15
+B18 F1.13,Tutorial,15
+B18 F1.19,Tutorial,15
+B18 F1.2,Tutorial,15
+B18 F1.20,Tutorial,15
+B18 F1.5,Lecture,45
+B18 G02,Tutorial,15
+B18 G04,Tutorial,15
+B18 G08,Lecture,45
+B18 G09,Lecture,45
+B18 G11,Tutorial,15
+B18 G12,Tutorial,15
+B18 G13,Lecture,45
+B18-G01,Lab,15
+B18-G05,Lab,15
+B18-G14,Lab,15
+B18-G17,Lab,15
+B18-G20,Lecture,45
+COE PHY LAB,Lab,45
+G17-G01,Lab,45
+Theater B07,Lecture,45
+Theater B08,Lecture,45
+Theater B09,Lecture,45
+Theater B10,Lecture,45
+Theater B25 F1.19,Lecture,45

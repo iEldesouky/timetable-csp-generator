@@ -1,0 +1,48 @@
+﻿instructor_id,name,role,qualifications
+1,Salma Waleed,Teaching Assistant,"AID 312,AID 311"
+2,Ahmed Bayumi,Doctor,"AID 312,AID 428"
+3,Nourhan Waleed,Teaching Assistant,"AID 312,CNC 314"
+4,Zeina Shreif,Teaching Assistant,AID 427
+5,Zeina Ahmed,Teaching Assistant,"AID 428,AID 427,AID 321"
+6,Bottleneck,Teaching Assistant,"AID 427, AID 428"
+7,Heba,Teaching Assistant,CNC 111
+8,Menna Hamdy,Teaching Assistant,"CNC 111, AID 427"
+9,Ahmed Anter,Doctor,"CNC 111,AID 311"
+10,Omnia Shehata,Teaching Assistant,"CNC 111,AID 428,AID 321"
+11,Nada Hamdy,Teaching Assistant,"CNC 111,CNC 311"
+12,Samir Ahmed,Professor,CNC 311
+13,Fatma Elsayed,Teaching Assistant,"CNC 311,AID 417"
+14,Mohamed Issa,Doctor,"CNC 314,AID 417"
+15,Mariam Ismael,Teaching Assistant,CSC 111
+16,Nour Akram,Teaching Assistant,CSC 111
+17,Nada Essam,Teaching Assistant,"CSC 111,AID 411"
+18,Mariem Nagy,Teaching Assistant,"CSC 111,AID 413"
+19,Reda Elbasiony,Doctor,"CSC 111,CNC 111"
+20,Marghany Hassan,Professor,"CSC 114,AID 411,AID 321"
+21,Salma Alashry,Teaching Assistant,"CSC 114,CNC 314,AID 321"
+22,Ahmed Arafa,Doctor,"CSC 211,AID 413,AID 427"
+23,Menna magdy,Teaching Assistant,"CSC 211,CSC 317"
+24,Nada Ahmed,Teaching Assistant,"CSC 211,CSC 317"
+25,Hataba,Doctor,CSC 317
+26,Heba Abdelkader,Teaching Assistant,CSE 214
+27,Mostafa Soliman,Professor,CSE 214
+28,Omnya Ramadan,Teaching Assistant,CSE 214
+29,Ahmed Allam,Professor,ECE 111
+30,Sameh Sherif,Doctor,ECE 111
+31,Mowahed El Qotren,Teaching Assistant,"ECE 111,PHY 113,ACM 215"
+32,Ahmed Abdel-Malk,Doctor,"ECE 324,ACM 215"
+33,Ayan w Mayet,Teaching Assistant,"ECE 324,ACM 215"
+34,Sherine Elmotasem,Doctor,LRA 101
+35,Hamada El Safroot,Doctor,LRA 104
+36,Shamshoon,Doctor,LRA 105
+37,LBA,Professor,LRA 306
+38,Eman Refaat,Teaching Assistant,"LRA 401,LRA 403"
+39,Miyazawa,Teaching Assistant,"LRA 401,LRA 403"
+40,Rika,Teaching Assistant,"LRA 401,LRA 403"
+41,Sato,Teaching Assistant,"LRA 401,LRA 403"
+42,Ayman Arafa,Doctor,"MTH 111,ACM 215,MTH 212"
+43,Abo Rehab,Teaching Assistant,"MTH 111,MTH 212,ACM 215"
+44,Adel Shakal,Teaching Assistant,"MTH 111,PHY 113,MTH 212"
+45,Ahmed Zakaria,Professor,"MTH 212,MTH 111,ACM 215"
+46,Adel Fathy,Doctor,PHY 113
+47,Mofareq El Qotren,Teaching Assistant,"PHY 113,ECE 111,ACM 215"
