@@ -1,21 +1,61 @@
-﻿time_slot_id,day,start_time,end_time
-sun_9:00_10:30,Sunday,9:00,10:30
-sun_10:45_12:15,Sunday,10:45,12:15
-sun_12:30_2:00,Sunday,12:30,2:00
-sun_2:15_3:45,Sunday,2:15,3:45
-mon_9:00_10:30,Monday,9:00,10:30
-mon_10:45_12:15,Monday,10:45,12:15
-mon_12:30_2:00,Monday,12:30,2:00
-mon_2:15_3:45,Monday,2:15,3:45
-tue_9:00_10:30,Tuesday,9:00,10:30
-tue_10:45_12:15,Tuesday,10:45,12:15
-tue_12:30_2:00,Tuesday,12:30,2:00
-tue_2:15_3:45,Tuesday,2:15,3:45
-wed_9:00_10:30,Wednesday,9:00,10:30
-wed_10:45_12:15,Wednesday,10:45,12:15
-wed_12:30_2:00,Wednesday,12:30,2:00
-wed_2:15_3:45,Wednesday,2:15,3:45
-thu_9:00_10:30,Thursday,9:00,10:30
-thu_10:45_12:15,Thursday,10:45,12:15
-thu_12:30_2:00,Thursday,12:30,2:00
-thu_2:15_3:45,Thursday,2:15,3:45
+Day,StartTime,EndTime,Duration
+Sunday,9:00 AM,10:30 AM,90
+Sunday,10:45 AM,12:15 PM,90
+Sunday,12:30 PM,2:00 PM,90
+Sunday,2:15 PM,3:45 PM,90
+Sunday,9:00 AM,9:45 AM,45
+Sunday,9:45 AM,10:30 AM,45
+Sunday,10:45 AM,11:30 AM,45
+Sunday,11:30 AM,12:15 PM,45
+Sunday,12:30 PM,1:15 PM,45
+Sunday,1:15 PM,2:00 PM,45
+Sunday,2:15 PM,3:00 PM,45
+Sunday,3:00 PM,3:45 PM,45
+Monday,9:00 AM,10:30 AM,90
+Monday,10:45 AM,12:15 PM,90
+Monday,12:30 PM,2:00 PM,90
+Monday,2:15 PM,3:45 PM,90
+Monday,9:00 AM,9:45 AM,45
+Monday,9:45 AM,10:30 AM,45
+Monday,10:45 AM,11:30 AM,45
+Monday,11:30 AM,12:15 PM,45
+Monday,12:30 PM,1:15 PM,45
+Monday,1:15 PM,2:00 PM,45
+Monday,2:15 PM,3:00 PM,45
+Monday,3:00 PM,3:45 PM,45
+Tuesday,9:00 AM,10:30 AM,90
+Tuesday,10:45 AM,12:15 PM,90
+Tuesday,12:30 PM,2:00 PM,90
+Tuesday,2:15 PM,3:45 PM,90
+Tuesday,9:00 AM,9:45 AM,45
+Tuesday,9:45 AM,10:30 AM,45
+Tuesday,10:45 AM,11:30 AM,45
+Tuesday,11:30 AM,12:15 PM,45
+Tuesday,12:30 PM,1:15 PM,45
+Tuesday,1:15 PM,2:00 PM,45
+Tuesday,2:15 PM,3:00 PM,45
+Tuesday,3:00 PM,3:45 PM,45
+Wednesday,9:00 AM,10:30 AM,90
+Wednesday,10:45 AM,12:15 PM,90
+Wednesday,12:30 PM,2:00 PM,90
+Wednesday,2:15 PM,3:45 PM,90
+Wednesday,9:00 AM,9:45 AM,45
+Wednesday,9:45 AM,10:30 AM,45
+Wednesday,10:45 AM,11:30 AM,45
+Wednesday,11:30 AM,12:15 PM,45
+Wednesday,12:30 PM,1:15 PM,45
+Wednesday,1:15 PM,2:00 PM,45
+Wednesday,2:15 PM,3:00 PM,45
+Wednesday,3:00 PM,3:45 PM,45
+Thursday,9:00 AM,10:30 AM,90
+Thursday,10:45 AM,12:15 PM,90
+Thursday,12:30 PM,2:00 PM,90
+Thursday,2:15 PM,3:45 PM,90
+Thursday,9:00 AM,9:45 AM,45
+Thursday,9:45 AM,10:30 AM,45
+Thursday,10:45 AM,11:30 AM,45
+Thursday,11:30 AM,12:15 PM,45
+Thursday,12:30 PM,1:15 PM,45
+Thursday,1:15 PM,2:00 PM,45
+Thursday,2:15 PM,3:00 PM,45
+Thursday,3:00 PM,3:45 PM,45
