@@ -1,4 +1,4 @@
-# app.py - UPDATED VERSION
+# app.py - UPDATED VERSION WITH INSTRUCTOR VIEW RESTORED
 import streamlit as st
 import pandas as pd
 import time
@@ -199,6 +199,7 @@ def main():
         "📊 Data Upload & Generate", 
         "📅 Grid Timetable View",
         "🎓 Student Section View",
+        "👨‍🏫 Instructor View",  # ADDED BACK
         "📈 Statistics"
     ])
     
@@ -208,6 +209,8 @@ def main():
         show_grid_timetable_view()
     elif page == "🎓 Student Section View":
         show_student_section_view()
+    elif page == "👨‍🏫 Instructor View":  # ADDED BACK
+        show_instructor_view()
     elif page == "📈 Statistics":
         show_statistics()
 
@@ -219,6 +222,7 @@ def show_upload_and_generate():
     - 🚀 **Faster Generation** (Target: 10-30 seconds)
     - 🎨 **Beautiful Grid Display**
     - 👨‍🎓 **Student Section Views**
+    - 👨‍🏫 **Instructor Views**  <!-- ADDED BACK -->
     - 📱 **Mobile-Friendly Design**
     """)
     
@@ -410,7 +414,7 @@ def show_grid_timetable_view():
     
     # Display options
     st.subheader("🎨 Display Options")
-    display_mode = st.radio("View Mode", ["Colorful Grid", "Compact Table", "By Day", "By Room"])
+    display_mode = st.radio("View Mode", ["Colorful Grid", "Compact Table", "By Day", "By Room", "By Instructor"])  # ADDED INSTRUCTOR OPTION
     
     if display_mode == "Colorful Grid":
         # Create and display grid
@@ -444,6 +448,16 @@ def show_grid_timetable_view():
         st.dataframe(
             room_df[['CourseID', 'CourseName', 'SectionID', 'SessionType',
                     'Day', 'StartTime', 'EndTime', 'Instructor']],
+            use_container_width=True,
+            height=400
+        )
+    
+    elif display_mode == "By Instructor":  # ADDED BACK
+        instructor_select = st.selectbox("Select Instructor:", sorted(df['Instructor'].unique()), key="instructor_view")
+        instructor_df = df[df['Instructor'] == instructor_select].sort_values(['Day', 'StartTime'])
+        st.dataframe(
+            instructor_df[['CourseID', 'CourseName', 'SectionID', 'SessionType',
+                          'Day', 'StartTime', 'EndTime', 'Room']],
             use_container_width=True,
             height=400
         )
@@ -514,6 +528,113 @@ def show_student_section_view():
         
         else:
             st.warning(f"No classes found for section {selected_section}")
+
+def show_instructor_view():  # ADDED BACK - DEDICATED INSTRUCTOR PAGE
+    st.header("👨‍🏫 Instructor Timetable View")
+    
+    if st.session_state.timetable_df is None or st.session_state.timetable_df.empty:
+        st.warning("⚠️ No timetable generated yet. Please generate a timetable first.")
+        return
+    
+    df = st.session_state.timetable_df
+    
+    # Instructor selection
+    st.subheader("Select Instructor")
+    instructors = sorted(df['Instructor'].unique().tolist())
+    selected_instructor = st.selectbox("Instructor Name", instructors)
+    
+    if selected_instructor:
+        # Get instructor timetable
+        instructor_df = df[df['Instructor'] == selected_instructor].copy()
+        
+        if not instructor_df.empty:
+            st.success(f"📅 Teaching Schedule for {selected_instructor}")
+            
+            # Sort by day and time
+            day_order = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']
+            instructor_df['DayOrder'] = instructor_df['Day'].map(lambda x: day_order.index(x) if x in day_order else 999)
+            
+            def time_to_minutes(time_str):
+                try:
+                    time_part, period = time_str.strip().split()
+                    hours, minutes = map(int, time_part.split(':'))
+                    if period == 'PM' and hours != 12:
+                        hours += 12
+                    elif period == 'AM' and hours == 12:
+                        hours = 0
+                    return hours * 60 + minutes
+                except:
+                    return 9999
+            
+            instructor_df['TimeOrder'] = instructor_df['StartTime'].apply(time_to_minutes)
+            instructor_df = instructor_df.sort_values(['DayOrder', 'TimeOrder']).drop(['DayOrder', 'TimeOrder'], axis=1)
+            
+            # Display summary stats
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Classes", len(instructor_df))
+            with col2:
+                st.metric("Different Courses", instructor_df['CourseID'].nunique())
+            with col3:
+                st.metric("Different Sections", instructor_df['SectionID'].nunique())
+            with col4:
+                st.metric("Busiest Day", instructor_df['Day'].mode().iloc[0] if not instructor_df.empty else "N/A")
+            
+            # Display as beautiful cards for each day
+            days = sorted(instructor_df['Day'].unique())
+            
+            for day in days:
+                st.subheader(f"📅 {day}")
+                day_classes = instructor_df[instructor_df['Day'] == day].sort_values('StartTime')
+                
+                for _, class_info in day_classes.iterrows():
+                    with st.container():
+                        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+                        
+                        with col1:
+                            st.write(f"**{class_info['CourseID']} - {class_info['CourseName']}**")
+                            st.write(f"*{class_info['SessionType']}* • Section {class_info['SectionID']}")
+                        
+                        with col2:
+                            st.write(f"🕒 {class_info['StartTime']} - {class_info['EndTime']}")
+                        
+                        with col3:
+                            st.write(f"🏫 {class_info['Room']}")
+                        
+                        with col4:
+                            # Color code by session type
+                            session_type = class_info['SessionType']
+                            if session_type == 'Lecture':
+                                st.success("📚 Lecture")
+                            elif session_type == 'Lab':
+                                st.info("🔬 Lab")
+                            else:
+                                st.warning("💻 TUT")
+                        
+                        st.divider()
+            
+            # Also show as data table
+            st.subheader("📋 Detailed Schedule Table")
+            st.dataframe(
+                instructor_df[['CourseID', 'CourseName', 'SectionID', 'SessionType',
+                              'Day', 'StartTime', 'EndTime', 'Room']],
+                use_container_width=True,
+                height=400
+            )
+            
+            # Export functionality for this instructor
+            st.subheader("💾 Export Instructor Schedule")
+            csv_data = instructor_df.to_csv(index=False)
+            st.download_button(
+                label=f"📥 Download {selected_instructor}'s Schedule (CSV)",
+                data=csv_data,
+                file_name=f"{selected_instructor.replace(' ', '_')}_schedule_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        else:
+            st.warning(f"No classes found for instructor {selected_instructor}")
 
 def show_statistics():
     st.header("📈 Timetable Statistics")
