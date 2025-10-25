@@ -1,9 +1,12 @@
+# app.py - UPDATED VERSION
 import streamlit as st
 import pandas as pd
 import time
 from datetime import datetime
 import sys
 import os
+import plotly.graph_objects as go
+import plotly.express as px
 
 # Set page config MUST be the first Streamlit command
 st.set_page_config(
@@ -13,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Add the src directory to Python path
+# Add the current directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
@@ -26,9 +29,161 @@ except ImportError as e:
     st.error("Please make sure csp_solver.py is in the same directory")
     st.stop()
 
+def create_weekly_grid(timetable_df, selected_section=None):
+    """Create a beautiful weekly grid timetable"""
+    if timetable_df is None or timetable_df.empty:
+        return None
+    
+    # Filter by section if provided
+    df = timetable_df.copy()
+    if selected_section and selected_section != "All":
+        df = df[df['SectionID'] == selected_section]
+    
+    # Define day and time order
+    day_order = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']
+    time_slots = [
+        ('9:00 AM', '10:30 AM'),
+        ('10:45 AM', '12:15 PM'), 
+        ('12:30 PM', '2:00 PM'),
+        ('2:15 PM', '3:45 PM'),
+    ]
+    
+    # Create empty grid
+    grid_data = []
+    for start_time, end_time in time_slots:
+        row = {'Time': f"{start_time.split()[0]}-{end_time.split()[0]} {end_time.split()[1]}"}
+        for day in day_order:
+            day_classes = df[(df['Day'] == day) & 
+                           (df['StartTime'] == start_time) & 
+                           (df['EndTime'] == end_time)]
+            
+            if not day_classes.empty:
+                class_info = []
+                for _, class_row in day_classes.iterrows():
+                    class_text = f"{class_row['CourseID']}\n{class_row['SessionType']}\n{class_row['Instructor'].split()[-1]}\n{class_row['Room']}"
+                    class_info.append(class_text)
+                row[day] = "<br>".join(class_info)
+            else:
+                row[day] = ""
+        grid_data.append(row)
+    
+    return pd.DataFrame(grid_data)
+
+def create_section_timetable(timetable_df, section_id):
+    """Create a dedicated timetable view for a specific section"""
+    if timetable_df is None or timetable_df.empty:
+        return None
+    
+    section_df = timetable_df[timetable_df['SectionID'] == section_id].copy()
+    if section_df.empty:
+        return None
+    
+    # Sort by day and time
+    day_order = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']
+    section_df['DayOrder'] = section_df['Day'].map(lambda x: day_order.index(x) if x in day_order else 999)
+    
+    def time_to_minutes(time_str):
+        try:
+            time_part, period = time_str.strip().split()
+            hours, minutes = map(int, time_part.split(':'))
+            if period == 'PM' and hours != 12:
+                hours += 12
+            elif period == 'AM' and hours == 12:
+                hours = 0
+            return hours * 60 + minutes
+        except:
+            return 9999
+    
+    section_df['TimeOrder'] = section_df['StartTime'].apply(time_to_minutes)
+    section_df = section_df.sort_values(['DayOrder', 'TimeOrder']).drop(['DayOrder', 'TimeOrder'], axis=1)
+    
+    return section_df
+
+def display_colorful_grid(grid_df):
+    """Display the timetable as colorful grid"""
+    if grid_df is None or grid_df.empty:
+        st.warning("No data available for grid display")
+        return
+    
+    styled_df = grid_df.set_index('Time')
+    
+    # Display with DARK MODE styling
+    st.markdown("### 🗓️ Weekly Timetable Grid (Dark Mode)")
+    
+    # DARK MODE HTML table
+    html_table = """
+    <style>
+    .timetable-grid {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: Arial, sans-serif;
+        color: #e0e0e0;
+    }
+    .timetable-grid th, .timetable-grid td {
+        border: 2px solid #555;
+        padding: 12px;
+        text-align: center;
+        vertical-align: top;
+    }
+    .timetable-grid th {
+        background-color: #2d4a2d;
+        color: #e0e0e0;
+        font-weight: bold;
+    }
+    .timetable-grid td {
+        background-color: #1e1e1e;
+        height: 120px;
+    }
+    .time-header {
+        background-color: #1a3a5f !important;
+        color: #e0e0e0;
+        font-weight: bold;
+    }
+    .class-cell {
+        background-color: #2a2a2a;
+        border-radius: 5px;
+        padding: 8px;
+        margin: 2px;
+        color: #e0e0e0;
+    }
+    .lecture { background-color: #1e3a5a; color: #bbdefb; }
+    .lab { background-color: #3a2a4a; color: #e1bee7; }
+    .tut { background-color: #2a3a2a; color: #c8e6c9; }
+    </style>
+    <table class='timetable-grid'>
+    <tr>
+        <th>Time</th>
+        <th>Sunday</th>
+        <th>Monday</th>
+        <th>Tuesday</th>
+        <th>Wednesday</th>
+        <th>Thursday</th>
+    </tr>
+    """
+    
+    for _, row in grid_df.iterrows():
+        html_table += f"<tr><td class='time-header'>{row['Time']}</td>"
+        for day in ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']:
+            cell_content = row[day]
+            if cell_content:
+                # Determine session type for coloring
+                session_type = "lecture"
+                if "Lab" in cell_content:
+                    session_type = "lab"
+                elif "TUT" in cell_content:
+                    session_type = "tut"
+                
+                html_table += f"<td><div class='class-cell {session_type}'>{cell_content.replace(chr(10), '<br>')}</div></td>"
+            else:
+                html_table += f"<td></td>"
+        html_table += "</tr>"
+    
+    html_table += "</table>"
+    st.markdown(html_table, unsafe_allow_html=True)
+
 def main():
     st.title("🎓 CSIT Automated Timetable Generator")
-    st.markdown("**Using Constraint Satisfaction Problems (CSP) - Proven Implementation**")
+    st.markdown("**Optimized CSP Algorithm • Fast Generation • Beautiful Grid Display**")
     
     # Initialize session state
     if 'timetable_df' not in st.session_state:
@@ -42,14 +197,17 @@ def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", [
         "📊 Data Upload & Generate", 
-        "📅 View Timetable",
+        "📅 Grid Timetable View",
+        "🎓 Student Section View",
         "📈 Statistics"
     ])
     
     if page == "📊 Data Upload & Generate":
         show_upload_and_generate()
-    elif page == "📅 View Timetable":
-        show_timetable_view()
+    elif page == "📅 Grid Timetable View":
+        show_grid_timetable_view()
+    elif page == "🎓 Student Section View":
+        show_student_section_view()
     elif page == "📈 Statistics":
         show_statistics()
 
@@ -57,12 +215,11 @@ def show_upload_and_generate():
     st.header("📊 Upload Data & Generate Timetable")
     
     st.info("""
-    **Required CSV Files:**
-    - **courses.csv**: CourseID, CourseName, Credits, Type, Year, Shared
-    - **instructors.csv**: InstructorID, Name, Role, PreferredSlots, QualifiedCourses  
-    - **rooms.csv**: RoomID, Type, Capacity
-    - **timeslots.csv**: Day, StartTime, EndTime, Duration
-    - **sections.csv**: SectionID, Capacity
+    **Optimized Features:**
+    - 🚀 **Faster Generation** (Target: 10-30 seconds)
+    - 🎨 **Beautiful Grid Display**
+    - 👨‍🎓 **Student Section Views**
+    - 📱 **Mobile-Friendly Design**
     """)
     
     # File uploaders
@@ -83,13 +240,14 @@ def show_upload_and_generate():
     st.subheader("⚙️ Generation Settings")
     col1, col2 = st.columns(2)
     with col1:
-        timeout = st.slider("Search Timeout (seconds)", 30, 300, 120, 30)
+        timeout = st.slider("Search Timeout (seconds)", 10, 120, 30, 5)
+        st.info(f"Target: 10-30 seconds (optimized algorithm)")
     with col2:
         enable_permissive = st.checkbox("Enable Permissive Mode (if strict fails)", value=False)
+        enable_fast_mode = st.checkbox("🚀 Enable Fast Mode (Aggressive optimization)", value=True)
     
     # Generate button
     if st.button("🚀 Generate Timetable", type="primary", use_container_width=True):
-        # Check all files uploaded
         if not all([courses_file, instructors_file, rooms_file, timeslots_file, sections_file]):
             st.error("❌ Please upload all 5 CSV files before generating")
             return
@@ -97,11 +255,13 @@ def show_upload_and_generate():
         # Create progress indicators
         progress_bar = st.progress(0)
         status_text = st.empty()
+        time_tracker = st.empty()
         
         try:
             # Step 1: Load data
             status_text.text("📂 Loading CSV files...")
             progress_bar.progress(10)
+            start_load = time.time()
             
             courses_df = pd.read_csv(courses_file)
             instructors_df = pd.read_csv(instructors_file)
@@ -109,12 +269,13 @@ def show_upload_and_generate():
             timeslots_df = pd.read_csv(timeslots_file)
             sections_df = pd.read_csv(sections_file)
             
-            status_text.text("✅ Data loaded successfully")
-            progress_bar.progress(20)
+            load_time = time.time() - start_load
+            status_text.text(f"✅ Data loaded successfully ({load_time:.2f}s)")
+            progress_bar.progress(25)
             
             # Show data summary
             with st.expander("📊 Data Summary", expanded=False):
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     st.metric("Courses", len(courses_df))
                     st.metric("Instructors", len(instructors_df))
@@ -123,13 +284,16 @@ def show_upload_and_generate():
                     st.metric("Timeslots", len(timeslots_df))
                 with col3:
                     st.metric("Sections", len(sections_df))
+                with col4:
+                    st.metric("Data Load Time", f"{load_time:.2f}s")
             
             # Step 2: Generate timetable
-            status_text.text("🔄 Running CSP solver (this may take a while)...")
-            progress_bar.progress(30)
+            status_text.text("🔄 Running OPTIMIZED CSP solver...")
+            progress_bar.progress(40)
             
             start_time = time.time()
             
+            # Pass fast mode parameter to solver
             result = generate_timetable(
                 courses_df=courses_df,
                 instructors_df=instructors_df,
@@ -137,7 +301,8 @@ def show_upload_and_generate():
                 timeslots_df=timeslots_df,
                 sections_df=sections_df,
                 force_permissive=enable_permissive,
-                timeout=timeout
+                timeout=timeout,
+                fast_mode=enable_fast_mode  # New parameter for optimizations
             )
             
             generation_time = time.time() - start_time
@@ -148,7 +313,7 @@ def show_upload_and_generate():
                 st.error("❌ Could not find a valid timetable. Try enabling permissive mode or check your data.")
                 return
             
-            progress_bar.progress(70)
+            progress_bar.progress(80)
             status_text.text("📊 Formatting results...")
             
             # Step 3: Format for display
@@ -170,7 +335,8 @@ def show_upload_and_generate():
                 'total_assignments': len(result['solution']),
                 'variables': result['total_variables'],
                 'completion_rate': (len(result['solution']) / result['total_variables'] * 100) if result['total_variables'] > 0 else 0,
-                'generation_time': generation_time
+                'generation_time': generation_time,
+                'load_time': load_time
             }
             
             # Show success metrics
@@ -182,11 +348,17 @@ def show_upload_and_generate():
             with col2:
                 st.metric("Completion", f"{st.session_state.generation_stats['completion_rate']:.1f}%")
             with col3:
-                st.metric("Time Taken", f"{generation_time:.2f}s")
+                st.metric("Generation Time", f"{generation_time:.2f}s")
+                if generation_time <= 30:
+                    st.success("🚀 Fast!")
+                elif generation_time <= 60:
+                    st.warning("⚡ Moderate")
+                else:
+                    st.error("🐢 Slow")
             with col4:
                 st.metric("Classes Scheduled", len(timetable_df))
             
-            st.info("📅 Go to 'View Timetable' to see your generated schedule!")
+            st.info("📅 Go to 'Grid Timetable View' to see your beautiful schedule!")
             
         except Exception as e:
             progress_bar.progress(100)
@@ -196,8 +368,8 @@ def show_upload_and_generate():
             with st.expander("🔍 Error Details"):
                 st.code(traceback.format_exc())
 
-def show_timetable_view():
-    st.header("📅 View Generated Timetable")
+def show_grid_timetable_view():
+    st.header("📅 Weekly Timetable Grid View")
     
     if st.session_state.timetable_df is None or st.session_state.timetable_df.empty:
         st.warning("⚠️ No timetable generated yet. Please go to 'Data Upload & Generate' first.")
@@ -210,105 +382,138 @@ def show_timetable_view():
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        years = ["All"] + sorted([str(y) for y in df['CourseYear'].unique()])
-        selected_year = st.selectbox("Year", years)
+        sections = ["All"] + sorted(df['SectionID'].unique().tolist())
+        selected_section = st.selectbox("Section", sections)
     
     with col2:
-        days = ["All"] + sorted(df['Day'].unique())
-        selected_day = st.selectbox("Day", days)
+        years = ["All"] + sorted([str(y) for y in df['CourseYear'].unique()])
+        selected_year = st.selectbox("Year", years)
     
     with col3:
         sessions = ["All"] + sorted(df['SessionType'].unique())
         selected_session = st.selectbox("Session Type", sessions)
     
     with col4:
-        rooms = ["All"] + sorted(df['Room'].unique())
-        selected_room = st.selectbox("Room", rooms)
+        days = ["All"] + sorted(df['Day'].unique())
+        selected_day = st.selectbox("Day", days)
     
     # Apply filters
     filtered_df = df.copy()
+    if selected_section != "All":
+        filtered_df = filtered_df[filtered_df['SectionID'] == selected_section]
     if selected_year != "All":
         filtered_df = filtered_df[filtered_df['CourseYear'] == int(selected_year)]
-    if selected_day != "All":
-        filtered_df = filtered_df[filtered_df['Day'] == selected_day]
     if selected_session != "All":
         filtered_df = filtered_df[filtered_df['SessionType'] == selected_session]
-    if selected_room != "All":
-        filtered_df = filtered_df[filtered_df['Room'] == selected_room]
+    if selected_day != "All":
+        filtered_df = filtered_df[filtered_df['Day'] == selected_day]
     
-    # Tabs for different views
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📋 Full Schedule",
-        "📅 By Day",
-        "🏫 By Room", 
-        "👨‍🏫 By Instructor",
-        "🎓 By Year"
-    ])
+    # Display options
+    st.subheader("🎨 Display Options")
+    display_mode = st.radio("View Mode", ["Colorful Grid", "Compact Table", "By Day", "By Room"])
     
-    with tab1:
-        st.subheader("Complete Timetable")
+    if display_mode == "Colorful Grid":
+        # Create and display grid
+        grid_df = create_weekly_grid(filtered_df, selected_section if selected_section != "All" else None)
+        if grid_df is not None:
+            display_colorful_grid(grid_df)
+        else:
+            st.warning("No data available for the selected filters")
+    
+    elif display_mode == "Compact Table":
         st.dataframe(
             filtered_df[['CourseID', 'CourseName', 'SectionID', 'SessionType', 
                         'Day', 'StartTime', 'EndTime', 'Room', 'Instructor']],
             use_container_width=True,
-            height=500
+            height=400
         )
-        st.info(f"Showing {len(filtered_df)} of {len(df)} classes")
     
-    with tab2:
-        st.subheader("Schedule by Day")
+    elif display_mode == "By Day":
         day_select = st.selectbox("Select Day:", sorted(df['Day'].unique()), key="day_view")
         day_df = df[df['Day'] == day_select].sort_values('StartTime')
         st.dataframe(
             day_df[['CourseID', 'CourseName', 'SectionID', 'SessionType',
                    'StartTime', 'EndTime', 'Room', 'Instructor']],
             use_container_width=True,
-            height=500
+            height=400
         )
     
-    with tab3:
-        st.subheader("Schedule by Room")
+    elif display_mode == "By Room":
         room_select = st.selectbox("Select Room:", sorted(df['Room'].unique()), key="room_view")
         room_df = df[df['Room'] == room_select].sort_values(['Day', 'StartTime'])
         st.dataframe(
             room_df[['CourseID', 'CourseName', 'SectionID', 'SessionType',
                     'Day', 'StartTime', 'EndTime', 'Instructor']],
             use_container_width=True,
-            height=500
-        )
-    
-    with tab4:
-        st.subheader("Schedule by Instructor")
-        instructor_select = st.selectbox("Select Instructor:", sorted(df['Instructor'].unique()), key="instructor_view")
-        instructor_df = df[df['Instructor'] == instructor_select].sort_values(['Day', 'StartTime'])
-        st.dataframe(
-            instructor_df[['CourseID', 'CourseName', 'SectionID', 'SessionType',
-                          'Day', 'StartTime', 'EndTime', 'Room']],
-            use_container_width=True,
-            height=500
-        )
-    
-    with tab5:
-        st.subheader("Schedule by Year")
-        year_select = st.selectbox("Select Year:", sorted(df['CourseYear'].unique()), key="year_view")
-        year_df = df[df['CourseYear'] == year_select].sort_values(['Day', 'StartTime'])
-        st.dataframe(
-            year_df[['CourseID', 'CourseName', 'SectionID', 'SessionType',
-                    'Day', 'StartTime', 'EndTime', 'Room', 'Instructor']],
-            use_container_width=True,
-            height=500
+            height=400
         )
     
     # Export functionality
     st.subheader("💾 Export Timetable")
-    csv_data = df.to_csv(index=False)
+    csv_data = filtered_df.to_csv(index=False)
     st.download_button(
-        label="📥 Download Complete Timetable (CSV)",
+        label="📥 Download Filtered Timetable (CSV)",
         data=csv_data,
         file_name=f"timetable_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv",
         use_container_width=True
     )
+
+def show_student_section_view():
+    st.header("🎓 Student Section Timetable")
+    
+    if st.session_state.timetable_df is None or st.session_state.timetable_df.empty:
+        st.warning("⚠️ No timetable generated yet. Please generate a timetable first.")
+        return
+    
+    df = st.session_state.timetable_df
+    
+    # Section selection
+    st.subheader("Select Your Section")
+    sections = sorted(df['SectionID'].unique().tolist())
+    selected_section = st.selectbox("Section ID", sections)
+    
+    if selected_section:
+        # Get section timetable
+        section_df = create_section_timetable(df, selected_section)
+        
+        if section_df is not None and not section_df.empty:
+            st.success(f"📚 Timetable for Section {selected_section}")
+            
+            # Display as beautiful cards for each day
+            days = sorted(section_df['Day'].unique())
+            
+            for day in days:
+                st.subheader(f"📅 {day}")
+                day_classes = section_df[section_df['Day'] == day].sort_values('StartTime')
+                
+                for _, class_info in day_classes.iterrows():
+                    with st.container():
+                        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+                        
+                        with col1:
+                            st.write(f"**{class_info['CourseID']} - {class_info['CourseName']}**")
+                            st.write(f"*{class_info['SessionType']}*")
+                        
+                        with col2:
+                            st.write(f"🕒 {class_info['StartTime']} - {class_info['EndTime']}")
+                        
+                        with col3:
+                            st.write(f"🏫 {class_info['Room']}")
+                        
+                        with col4:
+                            st.write(f"👨‍🏫 {class_info['Instructor']}")
+                        
+                        st.divider()
+            
+            # Also show as grid
+            st.subheader("📊 Weekly View")
+            grid_df = create_weekly_grid(df, selected_section)
+            if grid_df is not None:
+                display_colorful_grid(grid_df)
+        
+        else:
+            st.warning(f"No classes found for section {selected_section}")
 
 def show_statistics():
     st.header("📈 Timetable Statistics")
@@ -329,49 +534,52 @@ def show_statistics():
     with col2:
         st.metric("Completion Rate", f"{stats['completion_rate']:.1f}%")
     with col3:
-        st.metric("Generation Time", f"{stats['generation_time']:.2f}s")
+        gen_time = stats['generation_time']
+        st.metric("Generation Time", f"{gen_time:.2f}s")
+        if gen_time <= 30:
+            st.success("🚀 Fast")
+        elif gen_time <= 60:
+            st.warning("⚡ Moderate")
+        else:
+            st.error("🐢 Needs optimization")
     with col4:
         st.metric("Classes/Second", f"{stats['total_assignments']/stats['generation_time']:.1f}")
     
-    # Session Type Distribution
-    st.subheader("📊 Session Type Distribution")
-    session_counts = df['SessionType'].value_counts()
-    col1, col2 = st.columns([2, 1])
+    # Visualizations
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.bar_chart(session_counts)
+        st.subheader("📊 Session Type Distribution")
+        session_counts = df['SessionType'].value_counts()
+        fig = px.pie(values=session_counts.values, names=session_counts.index, 
+                    title="Session Types")
+        st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        for session_type, count in session_counts.items():
-            st.metric(session_type, count)
+        st.subheader("📅 Classes per Day")
+        day_order = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']
+        day_counts = df['Day'].value_counts().reindex(day_order, fill_value=0)
+        fig = px.bar(x=day_counts.index, y=day_counts.values, 
+                    title="Classes per Day", color=day_counts.values,
+                    color_continuous_scale='viridis')
+        st.plotly_chart(fig, use_container_width=True)
     
-    # Daily Distribution
-    st.subheader("📅 Classes per Day")
-    day_order = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    day_counts = df['Day'].value_counts().reindex(day_order, fill_value=0)
-    st.bar_chart(day_counts)
-    
-    # Room Utilization
-    st.subheader("🏫 Room Utilization (Top 15)")
-    room_counts = df['Room'].value_counts().head(15)
-    st.bar_chart(room_counts)
-    
-    # Instructor Workload
-    st.subheader("👨‍🏫 Instructor Workload (Top 15)")
-    instructor_counts = df['Instructor'].value_counts().head(15)
-    st.bar_chart(instructor_counts)
-    
-    # Year Distribution
-    st.subheader("🎓 Classes by Year")
-    year_counts = df['CourseYear'].value_counts().sort_index()
-    col1, col2 = st.columns([2, 1])
+    # Room and Instructor utilization
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.bar_chart(year_counts)
+        st.subheader("🏫 Room Utilization (Top 10)")
+        room_counts = df['Room'].value_counts().head(10)
+        fig = px.bar(x=room_counts.index, y=room_counts.values,
+                    title="Most Used Rooms")
+        st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        for year, count in year_counts.items():
-            st.metric(f"Year {year}", count)
+        st.subheader("👨‍🏫 Instructor Workload (Top 10)")
+        instructor_counts = df['Instructor'].value_counts().head(10)
+        fig = px.bar(x=instructor_counts.index, y=instructor_counts.values,
+                    title="Busiest Instructors")
+        st.plotly_chart(fig, use_container_width=True)
 
 if __name__ == "__main__":
     main()
