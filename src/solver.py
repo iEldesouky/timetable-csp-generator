@@ -1,14 +1,12 @@
-# solver.py - IMPROVED WITH DEBUGGING AND OPTIMIZATION
-
+# [file name]: new_solver.py
 import time
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Set
 from csp_model import TimetableCSP
-from constraints import HardConstraints, ForwardChecking, SoftConstraints
 import streamlit as st
 
 class BacktrackingSolver:
     """
-    CSP solver with improved debugging and optimization
+    NEW Solver based on friend's working forward checking algorithm
     """
     
     def __init__(self, csp: TimetableCSP):
@@ -16,211 +14,252 @@ class BacktrackingSolver:
         self.backtrack_count = 0
         self.constraint_checks = 0
         self.start_time = 0
-        self.best_solution = None
-        self.best_penalty = float('inf')
-        self.assignment_history = []
+        self.solution = None
+        self.performance_metrics = {}
         
-    def backtracking_search(self, timeout: int = 120) -> Optional[Dict]:
+    def solve(self, timeout: int = 120) -> Optional[Dict]:
         """
-        Main backtracking search with debugging and progress tracking
+        Main solving method using friend's forward checking search
         """
         self._reset_counters()
         self.start_time = time.time()
         
-        # Create a copy of domains for forward checking
-        domains_copy = {var_id: list(domain) for var_id, domain in self.csp.domains.items()}
-        
-        # Create progress placeholder
+        # Create progress tracking
         progress_placeholder = st.empty()
         
-        solution = self._recursive_backtracking({}, domains_copy, timeout, progress_placeholder)
-        
-        # Clear progress placeholder
-        progress_placeholder.empty()
-        
-        # Return best solution found
-        return self.best_solution if self.best_solution else solution
+        try:
+            # Use friend's forward checking search algorithm
+            solution = self._forward_checking_search(timeout, progress_placeholder)
+            
+            # Clear progress placeholder
+            progress_placeholder.empty()
+            
+            self.solution = solution
+            return solution
+            
+        except Exception as e:
+            progress_placeholder.empty()
+            st.error(f"❌ Solver error: {str(e)}")
+            return None
     
     def _reset_counters(self):
         """Reset performance counters"""
         self.backtrack_count = 0
         self.constraint_checks = 0
-        self.best_solution = None
-        self.best_penalty = float('inf')
-        self.assignment_history = []
+        self.solution = None
+        self.performance_metrics = {}
     
-    def _recursive_backtracking(self, assignment: Dict, domains: Dict, timeout: int, progress_placeholder) -> Optional[Dict]:
+    def _forward_checking_search(self, timeout: int, progress_placeholder) -> Optional[Dict]:
         """
-        Recursive backtracking with progress tracking and timeout
+        Friend's working forward checking search implementation
         """
-        # Check timeout
-        current_time = time.time()
-        if current_time - self.start_time > timeout:
-            return None
+        assignment = {}
         
-        # If assignment is complete, return it
-        if len(assignment) == len(self.csp.variables):
-            penalty = SoftConstraints.calculate_solution_penalty(assignment, self.csp)
-            if penalty < self.best_penalty:
-                self.best_solution = assignment.copy()
-                self.best_penalty = penalty
-            return assignment
+        # Pre-compute constraint neighbors - variables that share any timeslot
+        var_timeslots = {}
+        for v in self.csp.variables:
+            ts_set = set()
+            for val in self.csp.domains[v.variable_id]:
+                ts_set.add(val['timeslot'])
+            var_timeslots[v.variable_id] = ts_set
         
-        # Update progress every 10 assignments or 2 seconds
-        if len(assignment) % 10 == 0 or (current_time - self.start_time) % 2 < 0.1:
-            self._update_progress(assignment, progress_placeholder)
+        constraint_neighbors = {}
+        for v in self.csp.variables:
+            neighbors = []
+            v_ts = var_timeslots[v.variable_id]
+            for other in self.csp.variables:
+                if other.variable_id != v.variable_id and v_ts & var_timeslots[other.variable_id]:
+                    neighbors.append(other.variable_id)
+            constraint_neighbors[v.variable_id] = neighbors
         
-        # Select variable using MRV heuristic
-        var = self._select_unassigned_variable_mrv(assignment, domains)
-        if not var:
-            return None
+        # Cache for faster lookups - tracks THREE resource types (friend's key insight!)
+        assigned_by_timeslot = {}  # timeslot -> {instructor: set(), room: set(), sections: set()}
+        local_domains = {v.variable_id: list(self.csp.domains[v.variable_id]) for v in self.csp.variables}
         
-        # Order values using LCV heuristic
-        values = self._order_domain_values_lcv(var, assignment, domains)
+        st.info(f"🔍 Constraint graph: {len(constraint_neighbors)} variables, avg neighbors: {sum(len(n) for n in constraint_neighbors.values())/len(constraint_neighbors):.1f}")
         
-        for value in values:
-            # Check timeout inside loop
+        def consistent(var_id, val):
+            """Fast consistency check using cached timeslot assignments"""
+            ts = val['timeslot']
+            if ts not in assigned_by_timeslot:
+                return True
+            
+            ts_data = assigned_by_timeslot[ts]
+            # Check for instructor, room, AND section conflicts (friend's triple check!)
+            var_sections = set(self.csp.meta[var_id]['sections'])
+            
+            if val['instructor'] in ts_data['instructor']:
+                return False
+            if val['room'] in ts_data['room']:
+                return False
+            # Check if any section in this variable's group is already assigned at this timeslot
+            if var_sections & ts_data['sections']:
+                return False
+            return True
+
+        def select_unassigned_var():
+            """MRV + Degree heuristic (friend's implementation)"""
+            unassigned = [v for v in self.csp.variables if v.variable_id not in assignment]
+            if not unassigned:
+                return None
+            
+            def heuristic(x):
+                domain_size = len(local_domains.get(x.variable_id, []))
+                if domain_size == 0:
+                    return (0, 0)  # Dead end - prioritize to fail fast
+                # Count unassigned neighbors
+                unassigned_neighbors = sum(1 for n in constraint_neighbors.get(x.variable_id, []) 
+                                        if n not in assignment)
+                return (domain_size, -unassigned_neighbors)
+            
+            return min(unassigned, key=heuristic)
+        
+        def order_domain_values(var):
+            """Order domain values - friend's simplified LCV"""
+            domain_vals = local_domains.get(var.variable_id, [])
+            
+            # For small domains, return as-is
+            if len(domain_vals) <= 10:
+                return domain_vals
+            
+            # For larger domains, prioritize timeslots with fewer assignments
+            def timeslot_score(val):
+                ts = val['timeslot']
+                ts_data = assigned_by_timeslot.get(ts, {})
+                # Count resources already used in this timeslot
+                used_count = len(ts_data.get('instructor', set())) + len(ts_data.get('room', set()))
+                return used_count
+            
+            # Sort by timeslot usage (least constraining first)
+            return sorted(domain_vals, key=timeslot_score)
+
+        backtrack_calls = [0]
+        max_depth = [0]
+        
+        def backtrack(depth=0):
+            backtrack_calls[0] += 1
+            max_depth[0] = max(max_depth[0], depth)
+            
+            # Check timeout
             if time.time() - self.start_time > timeout:
                 return None
+            
+            # Update progress every 10 assignments
+            if len(assignment) % 10 == 0:
+                progress = len(assignment) / len(self.csp.variables)
+                elapsed = time.time() - self.start_time
+                progress_placeholder.info(
+                    f"**Search Progress:** {len(assignment)}/{len(self.csp.variables)} "
+                    f"({progress:.1%}) | Time: {elapsed:.1f}s | Backtracks: {self.backtrack_count}"
+                )
+            
+            # Check if complete
+            if len(assignment) == len(self.csp.variables):
+                return assignment.copy()
+            
+            var = select_unassigned_var()
+            if var is None:
+                return None
+            
+            # Check if domain is empty (dead end)
+            domain_vals = order_domain_values(var)
+            if not domain_vals:
+                return None
+            
+            for val in domain_vals:
+                self.constraint_checks += 1
                 
-            # Check constraints
-            self.constraint_checks += 1
-            if HardConstraints.check_all_constraints(assignment, var.variable_id, value, self.csp):
+                if not consistent(var.variable_id, val):
+                    continue
+                
                 # Make assignment
-                assignment[var.variable_id] = value
-                self.csp.assignments[var.variable_id] = value
+                assignment[var.variable_id] = val
+                ts = val['timeslot']
                 
-                # Do forward checking
-                domains_before_fc = {var_id: list(domain) for var_id, domain in domains.items()}
-                fc_success = ForwardChecking.do_forward_checking(assignment, var.variable_id, value, domains, self.csp)
+                # Update timeslot tracking - add instructor, room, AND sections
+                if ts not in assigned_by_timeslot:
+                    assigned_by_timeslot[ts] = {'instructor': set(), 'room': set(), 'sections': set()}
+                assigned_by_timeslot[ts]['instructor'].add(val['instructor'])
+                assigned_by_timeslot[ts]['room'].add(val['room'])
+                # Add all sections from this variable's group to the timeslot
+                for section in self.csp.meta[var.variable_id]['sections']:
+                    assigned_by_timeslot[ts]['sections'].add(section)
                 
-                if fc_success:
-                    result = self._recursive_backtracking(assignment, domains, timeout, progress_placeholder)
+                removed = {}
+                failure = False
+                
+                # Forward checking - prune inconsistent values from neighbor domains
+                for neighbor_id in constraint_neighbors.get(var.variable_id, []):
+                    if neighbor_id in assignment:
+                        continue
+                    
+                    # Get sections for the neighbor variable
+                    neighbor_sections = set(self.csp.meta[neighbor_id]['sections'])
+                    
+                    new_domain = []
+                    for nval in local_domains.get(neighbor_id, []):
+                        # Keep if different timeslot or no conflicts
+                        if nval['timeslot'] != ts:
+                            new_domain.append(nval)
+                        elif (nval['instructor'] != val['instructor'] and 
+                              nval['room'] != val['room'] and 
+                              not (neighbor_sections & assigned_by_timeslot[ts]['sections'])):
+                            new_domain.append(nval)
+                    
+                    if len(new_domain) == 0:
+                        failure = True
+                        break
+                    
+                    if len(new_domain) < len(local_domains[neighbor_id]):
+                        removed[neighbor_id] = local_domains[neighbor_id]
+                        local_domains[neighbor_id] = new_domain
+                
+                if not failure:
+                    result = backtrack(depth + 1)
                     if result is not None:
                         return result
                 
-                # Restore domains and backtrack
-                assignment.pop(var.variable_id)
-                if var.variable_id in self.csp.assignments:
-                    del self.csp.assignments[var.variable_id]
-                domains.update(domains_before_fc)
-                self.backtrack_count += 1
-        
-        return None
-    
-    def _update_progress(self, assignment: Dict, progress_placeholder):
-        """Update progress display"""
-        progress = len(assignment) / len(self.csp.variables)
-        elapsed_time = time.time() - self.start_time
-        
-        progress_text = f"""
-        **Search Progress:**
-        - Variables assigned: {len(assignment)}/{len(self.csp.variables)} ({progress:.1%})
-        - Backtracks: {self.backtrack_count}
-        - Constraint checks: {self.constraint_checks}
-        - Time elapsed: {elapsed_time:.1f}s
-        """
-        
-        if self.best_solution:
-            progress_text += f"- Best solution quality: {self.best_penalty}"
-        
-        progress_placeholder.info(progress_text)
-    
-    def _select_unassigned_variable_mrv(self, assignment: Dict, domains: Dict):
-        """
-        MRV heuristic: choose variable with smallest domain
-        Also consider degree heuristic as tie-breaker
-        """
-        unassigned_vars = [var for var in self.csp.variables if var.variable_id not in assignment]
-        
-        if not unassigned_vars:
-            return None
-        
-        # Find variables with minimum remaining values
-        min_domain_size = min(len(domains[var.variable_id]) for var in unassigned_vars)
-        mrv_vars = [var for var in unassigned_vars if len(domains[var.variable_id]) == min_domain_size]
-        
-        # If tie, use degree heuristic (variable involved in most constraints)
-        if len(mrv_vars) > 1:
-            return max(mrv_vars, key=self._calculate_variable_degree)
-        
-        return mrv_vars[0]
-    
-    def _calculate_variable_degree(self, variable):
-        """
-        Calculate how constrained a variable is (degree heuristic)
-        """
-        degree = 0
-        for other_var in self.csp.variables:
-            if other_var.variable_id != variable.variable_id:
-                # Count constraints with other variables
-                if (variable.course_id == other_var.course_id or
-                    variable.activity_type == other_var.activity_type):
-                    degree += 1
-        return degree
-    
-    def _order_domain_values_lcv(self, var, assignment: Dict, domains: Dict) -> List[Tuple]:
-        """
-        LCV heuristic: order values by how constraining they are
-        """
-        # For large domains, sample to avoid performance issues
-        domain_values = domains[var.variable_id]
-        if len(domain_values) > 100:  # Limit for performance
-            domain_values = domain_values[:100]
-        
-        value_constraints = []
-        
-        for value in domain_values:
-            constraint_count = 0
-            
-            # Sample other variables to avoid O(n^2) complexity
-            other_vars_sample = [v for v in self.csp.variables 
-                               if v.variable_id != var.variable_id and v.variable_id not in assignment]
-            if len(other_vars_sample) > 50:  # Limit sampling
-                import random
-                other_vars_sample = random.sample(other_vars_sample, 50)
-            
-            for other_var in other_vars_sample:
-                # Sample domain values for other variable
-                other_domain = domains[other_var.variable_id]
-                if len(other_domain) > 20:  # Limit sampling
-                    other_domain = other_domain[:20]
+                # Restore domains
+                for k, v in removed.items():
+                    local_domains[k] = v
                 
-                for other_value in other_domain:
-                    if not self._are_values_consistent(value, other_value):
-                        constraint_count += 1
+                # Restore timeslot tracking - remove instructor, room, AND sections
+                assigned_by_timeslot[ts]['instructor'].discard(val['instructor'])
+                assigned_by_timeslot[ts]['room'].discard(val['room'])
+                for section in self.csp.meta[var.variable_id]['sections']:
+                    assigned_by_timeslot[ts]['sections'].discard(section)
+                if not assigned_by_timeslot[ts]['instructor'] and not assigned_by_timeslot[ts]['room'] and not assigned_by_timeslot[ts]['sections']:
+                    del assigned_by_timeslot[ts]
+                
+                del assignment[var.variable_id]
+                self.backtrack_count += 1
             
-            value_constraints.append((value, constraint_count))
+            return None
+
+        st.info("🚀 Starting forward checking search...")
+        success = backtrack()
         
-        # Sort by constraint count (ascending - least constraining first)
-        value_constraints.sort(key=lambda x: x[1])
-        return [value for value, _ in value_constraints]
-    
-    def _are_values_consistent(self, value1: Tuple, value2: Tuple) -> bool:
-        """
-        Check if two values are consistent with each other
-        """
-        timeslot1, room1, instructor1 = value1
-        timeslot2, room2, instructor2 = value2
+        # Store performance metrics
+        self.performance_metrics = {
+            'backtrack_calls': backtrack_calls[0],
+            'max_depth': max_depth[0],
+            'constraint_checks': self.constraint_checks,
+            'search_time': time.time() - self.start_time
+        }
         
-        # Basic double-booking constraints
-        if timeslot1 == timeslot2:
-            if instructor1 == instructor2:  # Same instructor
-                return False
-            if room1 == room2:  # Same room
-                return False
+        st.info(f"✅ Search complete: {backtrack_calls[0]} backtracks, {max_depth[0]} max depth")
         
-        return True
-    
+        return success
+
     def get_performance_metrics(self) -> Dict:
-        """
-        Get comprehensive performance metrics
-        """
+        """Get comprehensive performance metrics"""
         return {
             'backtrack_count': self.backtrack_count,
             'constraint_checks': self.constraint_checks,
-            'solution_quality': self.best_penalty if self.best_solution else None,
-            'variables_assigned': len(self.best_solution) if self.best_solution else 0,
+            'variables_assigned': len(self.solution) if self.solution else 0,
             'total_variables': len(self.csp.variables),
-            'search_time': time.time() - self.start_time if self.start_time > 0 else 0
+            'search_time': self.performance_metrics.get('search_time', 0),
+            'backtrack_calls': self.performance_metrics.get('backtrack_calls', 0),
+            'max_depth': self.performance_metrics.get('max_depth', 0),
+            'completion_percentage': (len(self.solution) / len(self.csp.variables) * 100) if self.solution else 0
         }

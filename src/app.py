@@ -1,5 +1,4 @@
-# app.py - FIXED STREAMLIT CONFIGURATION
-
+# [file name]: app.py (UPDATED FOR NEW SYSTEM)
 import streamlit as st
 import pandas as pd
 import time
@@ -19,34 +18,25 @@ st.set_page_config(
 
 # Add the src directory to Python path to find our modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(current_dir, 'src')
+src_dir = current_dir  # Since we're in src folder
 sys.path.append(src_dir)
 
-# Import our CSP modules from src folder
+# Import our NEW CSP modules
 try:
     from data_loader import DataLoader
     from csp_model import TimetableCSP
     from solver import BacktrackingSolver
-    from utils import (format_timetable_for_display, calculate_solution_metrics, 
-                      create_timetable_visualization, create_instructor_workload_chart,
-                      export_timetable_to_csv, validate_solution_completeness,
-                      generate_solution_report)
+    from performance_analysis import PerformanceAnalyzer
+    from utils import format_timetable_for_display, export_timetable_to_csv
     st.success("✅ All modules imported successfully!")
 except ImportError as e:
     st.error(f"❌ Import error: {e}")
-    st.error(f"Looking for modules in: {src_dir}")
-    st.error("Files found in src/:")
-    try:
-        src_files = os.listdir(src_dir)
-        for file in src_files:
-            st.error(f"  - {file}")
-    except:
-        st.error("Could not list src/ directory")
+    st.error("Please make sure all required files are in the src/ directory")
     st.stop()
 
 def main():
     st.title("🎓 CSIT Automated Timetable Generator")
-    st.markdown("**Using Constraint Satisfaction Problems (CSP) - Exact Excel Structure**")
+    st.markdown("**Using Constraint Satisfaction Problems (CSP) - Working Implementation**")
     
     # Initialize session state
     if 'data_loader' not in st.session_state:
@@ -57,13 +47,16 @@ def main():
         st.session_state.generation_time = None
     if 'solver' not in st.session_state:
         st.session_state.solver = None
+    if 'csp' not in st.session_state:
+        st.session_state.csp = None
     
     # Sidebar navigation
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", [
         "📊 Data Management", 
         "⚙️ Generate Timetable", 
-        "📅 View Results"
+        "📅 View Results",
+        "📊 Performance Analysis"
     ])
     
     if page == "📊 Data Management":
@@ -72,18 +65,19 @@ def main():
         show_generation_page()
     elif page == "📅 View Results":
         show_results_page()
+    elif page == "📊 Performance Analysis":
+        show_performance_analysis()
 
 def show_data_management():
     st.header("📊 Data Management")
     
     st.info("""
-    **Required CSV Files Structure (from Excel):**
-    - **Courses.csv**: course_id, course_name, type
-    - **Instructors.csv**: instructor_id, name, role, qualifications  
-    - **Rooms.csv**: room_id, type, capacity
-    - **TimeSlots.csv**: time_slot_id, day, start_time, end_time
-    - **Sections.csv**: section_id, group_number, year, student_count
-    - **Curriculum.csv**: year, course_id
+    **Required CSV Files Structure (Your Friend's Format):**
+    - **courses.csv**: CourseID, CourseName, Type, Year
+    - **instructors.csv**: InstructorID, Name, Role, QualifiedCourses  
+    - **rooms.csv**: RoomID, Type, Capacity
+    - **timeslots.csv**: Day, StartTime, EndTime
+    - **sections.csv**: SectionID, Capacity
     """)
     
     tab1, tab2 = st.tabs(["📁 Upload Data", "👀 View Current Data"])
@@ -103,16 +97,15 @@ def show_data_management():
             st.markdown("**Required Files**")
             uploaded_timeslots = st.file_uploader("TimeSlots CSV", type="csv", key="timeslots_upload")
             uploaded_sections = st.file_uploader("Sections CSV", type="csv", key="sections_upload")
-            uploaded_curriculum = st.file_uploader("Curriculum CSV", type="csv", key="curriculum_upload")
         
         if st.button("🚀 Load All Data", type="primary", use_container_width=True):
             if (uploaded_courses and uploaded_instructors and uploaded_rooms and 
-                uploaded_timeslots and uploaded_sections and uploaded_curriculum):
+                uploaded_timeslots and uploaded_sections):
                 
-                with st.spinner("Loading and validating CSIT data..."):
+                with st.spinner("Loading and validating data..."):
                     success = st.session_state.data_loader.load_all_data(
                         uploaded_courses, uploaded_instructors, uploaded_rooms, 
-                        uploaded_timeslots, uploaded_sections, uploaded_curriculum
+                        uploaded_timeslots, uploaded_sections
                     )
                     
                     if success:
@@ -120,8 +113,10 @@ def show_data_management():
                         st.session_state.data_loader.validate_data_consistency()
                         st.success("🎉 All data loaded successfully! Proceed to Generate Timetable.")
                         st.balloons()
+                    else:
+                        st.error("❌ Failed to load data. Please check file formats.")
             else:
-                st.error("❌ Please upload all 6 required CSV files!")
+                st.error("❌ Please upload all 5 required CSV files!")
     
     with tab2:
         st.subheader("Current Dataset Preview")
@@ -131,7 +126,7 @@ def show_data_management():
             return
         
         data_type = st.selectbox("Select data to view", 
-                                ["Courses", "Instructors", "Rooms", "TimeSlots", "Sections", "Curriculum"])
+                                ["Courses", "Instructors", "Rooms", "TimeSlots", "Sections"])
         
         if data_type == "Courses":
             st.dataframe(st.session_state.data_loader.courses_df, use_container_width=True)
@@ -143,14 +138,12 @@ def show_data_management():
             st.dataframe(st.session_state.data_loader.timeslots_df, use_container_width=True)
         elif data_type == "Sections":
             st.dataframe(st.session_state.data_loader.sections_df, use_container_width=True)
-        elif data_type == "Curriculum":
-            st.dataframe(st.session_state.data_loader.curriculum_df, use_container_width=True)
         
         # Show data summary
         st.subheader("📊 Data Summary")
         summary = st.session_state.data_loader.get_data_summary()
         
-        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             st.metric("Courses", summary['courses_count'])
         with col2:
@@ -161,8 +154,6 @@ def show_data_management():
             st.metric("TimeSlots", summary['timeslots_count'])
         with col5:
             st.metric("Sections", summary['sections_count'])
-        with col6:
-            st.metric("Curriculum", summary['curriculum_entries'])
 
 def show_generation_page():
     st.header("⚙️ Generate Timetable")
@@ -182,24 +173,19 @@ def show_generation_page():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.subheader("Constraint Configuration")
+        st.subheader("Algorithm Configuration")
         
-        st.markdown("**Hard Constraints** (Always enforced)")
-        with st.expander("View Hard Constraints", expanded=True):
-            st.write("✅ No instructor double-booking")
-            st.write("✅ No room double-booking")
-            st.write("✅ Room type compatibility")
-            st.write("✅ Room capacity constraints")
-            st.write("✅ Instructor qualifications")
-            st.write("✅ Elective course coordination (LRA104/LRA105)")
-            st.write("✅ Same course lecture consistency")
+        st.markdown("**Working Features (Friend's Implementation)**")
+        with st.expander("View Implementation Details", expanded=True):
+            st.write("✅ **Course-Group-Session Variables**: Course::G0::Lecture format")
+            st.write("✅ **Smart Section Grouping**: Lectures(3-4), Labs(2), TUTs(1)")
+            st.write("✅ **Triple Constraint Checking**: Instructor + Room + Sections")
+            st.write("✅ **Department-Based Assignment**: Years 3-4 department matching")
+            st.write("✅ **Strict Role Assignment**: Professors→Lectures, Assistants→Labs/TUTs")
+            st.write("✅ **Forward Checking + MRV + LCV**: Advanced search heuristics")
         
-        st.markdown("**Soft Constraints** (Preferences)")
-        with st.expander("Configure Soft Constraints"):
-            st.checkbox("Avoid gaps in student schedules", value=True, disabled=True)
-            st.checkbox("Avoid early morning/late evening", value=True, disabled=True)
-            st.checkbox("Distribute classes evenly across week", value=True, disabled=True)
-            st.checkbox("Balance instructor workload", value=True, disabled=True)
+        st.markdown("**Search Algorithm**")
+        st.info("Using forward checking with backtracking, MRV, and degree heuristics")
     
     with col2:
         st.subheader("Solver Configuration")
@@ -212,32 +198,15 @@ def show_generation_page():
         if st.button("🎯 Generate Timetable", type="primary", use_container_width=True):
             generate_timetable(timeout)
         
-        # Add this button in the generation page, next to the main generate button
-    if st.button("🧪 Test with Small Subset", use_container_width=True):
-        test_with_small_subset()
-
-    def test_with_small_subset():
-        """Test with a smaller subset of data for debugging"""
-        # Create a minimal test case
-        st.info("Testing with minimal data subset...")
-    
-        # We'll use the existing data but show what's being processed
-        if st.session_state.data_loader.courses_df is not None:
-            st.write("**Courses available:**", len(st.session_state.data_loader.courses_df))
-            st.write("**Sections available:**", len(st.session_state.data_loader.sections_df))
-            st.write("**Timeslots available:**", len(st.session_state.data_loader.timeslots_df))
-            st.write("**Rooms available:**", len(st.session_state.data_loader.rooms_df))
-            st.write("**Instructors available:**", len(st.session_state.data_loader.instructors_df))
-
-        # Quick actions
-        st.markdown("### Quick Actions")
-        if st.button("🔄 Clear Results", use_container_width=True):
+        if st.button("🔄 Clear Previous Results", use_container_width=True):
             st.session_state.timetable = None
             st.session_state.solver = None
-            st.success("Results cleared!")
+            st.session_state.csp = None
+            st.session_state.generation_time = None
+            st.success("Previous results cleared!")
 
 def generate_timetable(timeout):
-    """Generate timetable using CSP solver with debug info"""
+    """Generate timetable using NEW CSP solver"""
     progress_bar = st.progress(0)
     status_text = st.empty()
     
@@ -245,8 +214,9 @@ def generate_timetable(timeout):
         status_text.text("Initializing CSP model...")
         progress_bar.progress(10)
         
-        # Initialize CSP
+        # Initialize CSP with friend's working architecture
         csp = TimetableCSP(st.session_state.data_loader)
+        st.session_state.csp = csp
         
         # Show debug information
         with st.expander("🔍 CSP Configuration Details", expanded=False):
@@ -255,18 +225,19 @@ def generate_timetable(timeout):
         status_text.text("Initializing solver...")
         progress_bar.progress(30)
         
-        # Initialize solver
-        st.session_state.solver = BacktrackingSolver(csp)
+        # Initialize solver with friend's forward checking
+        solver = BacktrackingSolver(csp)
+        st.session_state.solver = solver
         
-        status_text.text("Solving with Backtracking + MRV + LCV + Forward Checking...")
-        st.info("This may take a few minutes for large problems...")
+        status_text.text("Solving with Forward Checking + MRV + LCV...")
+        st.info("This uses your friend's working algorithm. Please wait...")
         progress_bar.progress(50)
         
         # Start timer
         start_time = time.time()
         
-        # Solve
-        solution = st.session_state.solver.backtracking_search(timeout=timeout)
+        # Solve using friend's algorithm
+        solution = solver.solve(timeout=timeout)
         
         end_time = time.time()
         generation_time = end_time - start_time
@@ -283,11 +254,20 @@ def generate_timetable(timeout):
         if solution:
             status_text.text("✅ Timetable generated successfully!")
             st.balloons()
+            
+            # Show quick stats
+            st.success(f"**Generated {len(solution)} assignments in {generation_time:.2f} seconds**")
+            
+            # Auto-navigate to results page
+            st.rerun()
         else:
-            status_text.text("⚠️ No solution found within timeout. Try increasing timeout or check CSP debug info.")
-        
-        # Auto-navigate to results page
-        st.rerun()
+            status_text.text("⚠️ No solution found within timeout.")
+            st.error("""
+            **Possible reasons:**
+            - Not enough timeslots/rooms/instructors
+            - Overly strict constraints
+            - Try increasing timeout or checking CSP debug info
+            """)
         
     except Exception as e:
         st.error(f"❌ Error generating timetable: {str(e)}")
@@ -302,12 +282,12 @@ def show_results_page():
         st.warning("No timetable generated yet. Go to the 'Generate Timetable' page to create one.")
         return
     
-    st.success(f"Timetable generated successfully in {st.session_state.generation_time:.2f} seconds!")
+    st.success(f"✅ Timetable generated in {st.session_state.generation_time:.2f} seconds!")
     
     # Display timetable statistics
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Total Classes Scheduled", len(st.session_state.timetable))
+        st.metric("Total Assignments", len(st.session_state.timetable))
     with col2:
         st.metric("Generation Time", f"{st.session_state.generation_time:.2f}s")
     with col3:
@@ -315,23 +295,30 @@ def show_results_page():
     with col4:
         st.metric("Constraint Checks", st.session_state.solver.constraint_checks)
     
-    # Calculate and display solution metrics
-    timetable_df = format_timetable_for_display(st.session_state.timetable, st.session_state.data_loader)
-    metrics = calculate_solution_metrics(st.session_state.timetable, st.session_state.data_loader)
+    # Format timetable for display
+    timetable_df = format_timetable_for_display(
+        st.session_state.timetable, 
+        st.session_state.data_loader,
+        st.session_state.csp
+    )
     
-    # Display metrics in columns
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Lectures", metrics['lectures_count'])
-    with col2:
-        st.metric("Labs", metrics['labs_count'])
-    with col3:
-        st.metric("Tutorials", metrics['tutorials_count'])
+    # Display metrics
+    if not timetable_df.empty:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            lectures = len(timetable_df[timetable_df['Session'] == 'Lecture'])
+            st.metric("Lectures", lectures)
+        with col2:
+            labs = len(timetable_df[timetable_df['Session'] == 'Lab'])
+            st.metric("Labs", labs)
+        with col3:
+            tuts = len(timetable_df[timetable_df['Session'] == 'TUT'])
+            st.metric("Tutorials", tuts)
     
     # Display timetable in different formats
     st.subheader("Timetable Views")
     view_option = st.radio("View as:", 
-                          ["Table View", "By Day", "By Room", "By Instructor", "Visualization"], 
+                          ["Table View", "By Day", "By Room", "By Instructor", "By Year"], 
                           horizontal=True)
     
     if view_option == "Table View":
@@ -342,63 +329,29 @@ def show_results_page():
         display_by_room(timetable_df)
     elif view_option == "By Instructor":
         display_by_instructor(timetable_df)
-    elif view_option == "Visualization":
-        display_timetable_visualization(timetable_df)
+    elif view_option == "By Year":
+        display_by_year(timetable_df)
     
-    # Export and analysis section
-    st.subheader("Export & Analysis")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        # Download as CSV
-        csv_data = export_timetable_to_csv(timetable_df)
-        st.download_button(
-            "📥 Download as CSV",
-            csv_data,
-            "csit_timetable.csv",
-            "text/csv",
-            use_container_width=True
-        )
-    
-    with col2:
-        # Generate report
-        if st.button("📋 Generate Report", use_container_width=True):
-            report = generate_solution_report(
-                st.session_state.timetable, 
-                st.session_state.data_loader,
-                st.session_state.solver.get_performance_metrics()
-            )
-            st.text_area("Solution Report", report, height=300)
-    
-    with col3:
-        # Validation
-        if st.button("✅ Validate Solution", use_container_width=True):
-            validation = validate_solution_completeness(st.session_state.timetable, st.session_state.solver.csp)
-            if validation['is_complete']:
-                st.success("Solution is 100% complete!")
-            else:
-                st.warning(f"Solution is {validation['completion_percentage']:.1f}% complete")
-                st.write(f"Missing {len(validation['missing_assignments'])} assignments")
-    
-    # Performance analysis
-    st.subheader("Performance Analysis")
-    
+    # Export section
+    st.subheader("Export & Download")
     col1, col2 = st.columns(2)
     
     with col1:
-        # Day distribution chart
-        if 'day_distribution' in metrics:
-            fig = px.bar(x=list(metrics['day_distribution'].keys()), 
-                        y=list(metrics['day_distribution'].values()),
-                        title="Classes Distribution by Day",
-                        labels={'x': 'Day', 'y': 'Number of Classes'})
-            st.plotly_chart(fig, use_container_width=True)
+        # Download as CSV
+        if not timetable_df.empty:
+            csv_data = export_timetable_to_csv(timetable_df)
+            st.download_button(
+                "📥 Download as CSV",
+                csv_data,
+                "csit_timetable.csv",
+                "text/csv",
+                use_container_width=True
+            )
     
     with col2:
-        # Instructor workload
-        workload_chart = create_instructor_workload_chart(metrics)
-        if workload_chart:
-            st.plotly_chart(workload_chart, use_container_width=True)
+        if st.button("📊 Go to Performance Analysis", use_container_width=True):
+            st.session_state.page = "📊 Performance Analysis"
+            st.rerun()
 
 def display_timetable_table(timetable_df):
     """Display timetable as a searchable and filterable table"""
@@ -446,16 +399,53 @@ def display_by_instructor(timetable_df):
     instructor_data = timetable_df[timetable_df['Instructor'] == instructor].sort_values(['Day', 'Start Time'])
     st.dataframe(instructor_data, use_container_width=True)
 
-def display_timetable_visualization(timetable_df):
-    """Display timetable visualization"""
-    try:
-        fig = create_timetable_visualization(timetable_df)
-        if fig:
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No visualization available for the current data")
-    except Exception as e:
-        st.error(f"Could not generate visualization: {str(e)}")
+def display_by_year(timetable_df):
+    """Display timetable organized by year"""
+    # Extract year from SectionID (e.g., "1/5" -> 1, "3/CNC/1" -> 3)
+    def extract_year(section_id):
+        try:
+            return int(str(section_id).split('/')[0])
+        except:
+            return 0
+    
+    timetable_df['Year'] = timetable_df['SectionID'].apply(extract_year)
+    year = st.selectbox("Select year", sorted(timetable_df['Year'].unique()))
+    year_data = timetable_df[timetable_df['Year'] == year].sort_values(['Day', 'Start Time'])
+    st.dataframe(year_data.drop('Year', axis=1), use_container_width=True)
+
+def show_performance_analysis():
+    st.header("📊 Performance Analysis")
+    
+    if st.session_state.timetable is None or st.session_state.solver is None:
+        st.warning("No timetable generated yet. Generate a timetable first to see performance analysis.")
+        return
+    
+    # Get performance metrics
+    solver_metrics = st.session_state.solver.get_performance_metrics()
+    
+    # Run comprehensive analysis
+    analysis = PerformanceAnalyzer.analyze_solution_performance(
+        st.session_state.timetable,
+        st.session_state.csp,
+        solver_metrics,
+        st.session_state.data_loader
+    )
+    
+    # Display performance dashboard
+    PerformanceAnalyzer.create_performance_dashboard(analysis)
+    
+    # Additional detailed metrics
+    st.subheader("🔍 Detailed Solver Metrics")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Backtrack Calls", solver_metrics.get('backtrack_calls', 0))
+    with col2:
+        st.metric("Max Search Depth", solver_metrics.get('max_depth', 0))
+    with col3:
+        st.metric("Completion %", f"{solver_metrics.get('completion_percentage', 0):.1f}%")
+    with col4:
+        st.metric("Variables/Second", f"{solver_metrics.get('variables_assigned', 0) / solver_metrics.get('search_time', 1):.1f}")
 
 if __name__ == "__main__":
     main()
