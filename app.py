@@ -1,4 +1,4 @@
-# app.py - UPDATED VERSION WITH INSTRUCTOR VIEW RESTORED
+# Main Streamlit app for Timetable Generator
 import streamlit as st
 import pandas as pd
 import time
@@ -10,7 +10,7 @@ import plotly.express as px
 
 # Set page config MUST be the first Streamlit command
 st.set_page_config(
-    page_title="CSIT Timetable Generator", 
+    page_title="Automated Timetable Generator", 
     page_icon="🎓", 
     layout="wide",
     initial_sidebar_state="expanded"
@@ -23,7 +23,7 @@ sys.path.append(current_dir)
 # Import CSP solver
 try:
     from csp_solver import generate_timetable, format_timetable_for_display
-    st.success("✅ CSP Solver imported successfully!")
+    st.success("")
 except ImportError as e:
     st.error(f"❌ Import error: {e}")
     st.error("Please make sure csp_solver.py is in the same directory")
@@ -182,7 +182,7 @@ def display_colorful_grid(grid_df):
     st.markdown(html_table, unsafe_allow_html=True)
 
 def main():
-    st.title("🎓 CSIT Automated Timetable Generator")
+    st.title("🎓 Automated Timetable Generator")
     st.markdown("**Optimized CSP Algorithm • Fast Generation • Beautiful Grid Display**")
     
     # Initialize session state
@@ -199,7 +199,7 @@ def main():
         "📊 Data Upload & Generate", 
         "📅 Grid Timetable View",
         "🎓 Student Section View",
-        "👨‍🏫 Instructor View",  # ADDED BACK
+        "👨‍🏫 Instructor View",  
         "📈 Statistics"
     ])
     
@@ -209,7 +209,7 @@ def main():
         show_grid_timetable_view()
     elif page == "🎓 Student Section View":
         show_student_section_view()
-    elif page == "👨‍🏫 Instructor View":  # ADDED BACK
+    elif page == "👨‍🏫 Instructor View":  
         show_instructor_view()
     elif page == "📈 Statistics":
         show_statistics()
