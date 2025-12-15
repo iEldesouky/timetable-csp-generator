@@ -327,7 +327,7 @@ def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.radio(
         "Go to",
-        ["Upload & Generate", "View Timetables", "Statistics", "Export"]
+        ["Upload & Generate", "View Timetables", "Statistics"]
     )
     
     # Page routing
@@ -337,8 +337,6 @@ def main():
         show_view_page()
     elif page == "Statistics":
         show_statistics_page()
-    else:
-        show_export_page()
 
 
 def show_generation_page():
@@ -642,15 +640,6 @@ def show_student_view(df):
     grid_df = create_weekly_grid(df, selected_section)
     if not grid_df.empty:
         display_colorful_grid(grid_df)
-    
-    # Export option
-    csv_data = section_df.to_csv(index=False)
-    st.download_button(
-        "📥 Download Section Schedule",
-        data=csv_data,
-        file_name=f"section_{selected_section}_timetable.csv",
-        mime="text/csv"
-    )
 
 
 def show_instructor_view(df):
@@ -725,15 +714,6 @@ def show_instructor_view(df):
     grid_df = pd.DataFrame(grid_data)
     if not grid_df.empty:
         display_colorful_grid(grid_df)
-    
-    # Export
-    csv_data = instructor_df.to_csv(index=False)
-    st.download_button(
-        "📥 Download Instructor Schedule",
-        data=csv_data,
-        file_name=f"{selected_instructor.replace(' ', '_')}_schedule.csv",
-        mime="text/csv"
-    )
 
 
 def show_room_view(df):
@@ -808,15 +788,6 @@ def show_room_view(df):
     grid_df = pd.DataFrame(grid_data)
     if not grid_df.empty:
         display_colorful_grid(grid_df)
-    
-    # Export
-    csv_data = room_df.to_csv(index=False)
-    st.download_button(
-        "📥 Download Room Schedule",
-        data=csv_data,
-        file_name=f"room_{selected_room}_schedule.csv",
-        mime="text/csv"
-    )
 
 
 def show_complete_view(df):
@@ -902,16 +873,6 @@ def show_complete_view(df):
     grid_df = pd.DataFrame(grid_data)
     if not grid_df.empty:
         display_colorful_grid(grid_df)
-    
-    # Export
-    csv_data = filtered_df.to_csv(index=False)
-    st.download_button(
-        "📥 Download Filtered Schedule",
-        data=csv_data,
-        file_name=f"timetable_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
 
 
 def show_statistics_page():
@@ -991,82 +952,6 @@ def show_statistics_page():
     st.dataframe(stats_table, use_container_width=True, hide_index=True)
 
 
-def show_export_page():
-    """
-    Display export options
-    """
-    st.header("💾 Export Timetable")
-    
-    if st.session_state.timetable_data is None:
-        st.warning("No timetable generated yet")
-        return
-    
-    df = st.session_state.timetable_data
-    
-    st.subheader("Export Options")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Export full timetable
-        csv_data = df.to_csv(index=False)
-        st.download_button(
-            "📥 Download Full Timetable (CSV)",
-            data=csv_data,
-            file_name=f"full_timetable_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-    
-    with col2:
-        # Export by year
-        years = sorted(df['CourseYear'].unique())
-        selected_year = st.selectbox("Select Year for Export", years)
-        
-        year_df = df[df['CourseYear'] == selected_year].copy()
-        year_csv = year_df.to_csv(index=False)
-        
-        st.download_button(
-            f"📥 Download Year {selected_year} Timetable",
-            data=year_csv,
-            file_name=f"year_{selected_year}_timetable.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-    
-    # Export statistics report
-    st.subheader("Statistics Report")
-    stats = st.session_state.generation_stats
-    
-    stats_report = f"""
-CSIT Timetable Generation Report
-Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-Generation Time: {stats['generation_time']:.1f} seconds
-
-SUMMARY:
-- Total Classes: {stats['total_classes']}
-- Coverage: {stats['coverage']:.1f}%
-- Courses Scheduled: {stats['courses_scheduled']}
-- Sections Covered: {stats['sections_covered']}
-
-SESSION TYPE DISTRIBUTION:
-"""
-    for session_type, count in df['SessionType'].value_counts().items():
-        stats_report += f"- {session_type}: {count}\n"
-    
-    stats_report += f"""
-DAILY DISTRIBUTION:
-"""
-    for day, count in df['Day'].value_counts().items():
-        stats_report += f"- {day}: {count}\n"
-    
-    st.download_button(
-        "📥 Download Statistics Report",
-        data=stats_report,
-        file_name=f"statistics_report_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-        mime="text/plain",
-        use_container_width=True
-    )
 
 
 if __name__ == "__main__":
